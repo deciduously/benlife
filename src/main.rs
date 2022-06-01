@@ -1,3 +1,6 @@
+use benlife::App;
+
 fn main() {
-    println!("Hello, world!");
+	let _ = App::new();
+	println!("Hello, world!");
 }

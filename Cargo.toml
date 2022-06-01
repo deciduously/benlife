@@ -1,8 +1,18 @@
 [package]
-name = "benlife"
-license = "Unlicensed"
-version = "0.1.0"
+authors = ["Ben Lovy <ben@deciduously.com>", "Dan Lovy <danlovy1961@gmail.com>"]
+description = "A Conway's Game of Life GUI"
 edition = "2021"
+license = "Unlicensed"
+name = "benlife"
 publish = false
+repository = "https://github.com/deciduously/benlife"
+version = "0.1.0"
 
 [dependencies]
+rand = "0.8"
+
+
+
+[profile.release]
+lto = true
+strip = true
