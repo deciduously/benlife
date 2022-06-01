@@ -2,7 +2,7 @@
 
 mod app;
 mod controls;
-mod grid;
 mod render;
+mod universe;
 
 pub use app::App;

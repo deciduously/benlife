@@ -1,11 +1,11 @@
-//! The `App` consists of a Game of Life [`Grid`] and some user-tweakable [`Controls`].
+//! The `App` consists of a Game of Life [`Universe`] and some user-tweakable [`Controls`].
 
-use crate::{controls::Controls, grid::Universe};
+use crate::{controls::Controls, universe::Universe};
 
 #[derive(Default)]
 pub struct App {
 	controls: Controls,
-	grid: Universe,
+	universe: Universe,
 }
 
 impl App {

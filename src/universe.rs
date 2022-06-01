@@ -1,6 +1,5 @@
 use std::path::Iter;
 
-
 // TODO this is the stuff inherited from the orig.
 const BORDER_OFFSET: u8 = 25;
 const DEFAULT_ROWS: usize = 100;
@@ -13,12 +12,25 @@ const X_OFFSSET: u8 = 200;
 const Y_OFFSET: u8 = 25;
 
 /// The data structure holding the universe state.
-struct Grid(Vec<Vec<bool>>);
+struct Grid {
+	items: Vec<Vec<bool>>,
+}
 
 impl Grid {
+	/// Instantiate an empty [`Grid`].
 	pub fn new(rows: usize, cols: usize) -> Self {
-		let rows = vec![vec![false; cols]; rows];
-		Self(rows)
+		let items = vec![vec![false; cols]; rows];
+		Self { items }
+	}
+
+	/// Retrieve the current value at the given location.
+	pub fn get(&self, row: usize, col: usize) -> bool {
+		self.items[row][col]
+	}
+
+	/// Retreive the total length of this [`Grid`].
+	pub fn len(&self) -> usize {
+		self.items[0].len() * self.items.len()
 	}
 }
 
@@ -29,11 +41,15 @@ impl Default for Grid {
 }
 
 impl IntoIterator for Grid {
-    type Item = bool;
-    type IntoIter = GridIter;
-    fn into_iter(self) -> Self::IntoIter {
-        todo!()
-    }
+	type Item = bool;
+	type IntoIter = GridIter;
+	fn into_iter(self) -> Self::IntoIter {
+		GridIter {
+			grid: self,
+			col: 0,
+			row: 0,
+		}
+	}
 }
 
 struct GridIter {
@@ -42,16 +58,12 @@ struct GridIter {
 	row: usize,
 }
 
-impl GridIter {
-    fn new(grid: Grid, col: usize, row: usize) -> Self { Self { grid, col, row } }
-}
-
 impl Iterator for GridIter {
-    type Item = bool;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
+	type Item = bool;
+	fn next(&mut self) -> Option<Self::Item> {
+		let ret = self.grid.get(self.row, self.col);
+		todo!()
+	}
 }
 
 /// The `Grid` handles the Game of Life universe.
@@ -107,7 +119,7 @@ impl Universe {
 		self.switchmap = Grid::new(self.rows, self.cols);
 		self.randomize();
 	}
-	
+
 	/// I dont know why we need this either
 	fn set_grid(&mut self, row: usize, col: usize) {
 		todo!()
@@ -133,11 +145,10 @@ impl Universe {
 
 	/// Populate the grid with random live squares.
 	fn randomize(&mut self) {
-		for row in 0..self.rows {
-			for col in 0..self.cols {
-				
-			}
-		}
+		// for cell in self.iter_mut() {
+		// 	todo!()
+		// }
+		todo!()
 	}
 }
 
