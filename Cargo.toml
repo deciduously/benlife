@@ -9,7 +9,9 @@ repository = "https://github.com/deciduously/benlife"
 version = "0.1.0"
 
 [dependencies]
+eframe = "0.18"
 rand = "0.8"
+rfd = "0.8"
 
 [profile.release]
 lto = true

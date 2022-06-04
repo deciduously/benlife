@@ -1,36 +1,38 @@
-use std::path::Iter;
+use rand::Rng;
 
-// TODO this is the stuff inherited from the orig.
-const BORDER_OFFSET: u8 = 25;
+pub const DEFAULT_CELL_SIZE: u8 = 10;
 const DEFAULT_ROWS: usize = 100;
 const DEFAULT_COLS: usize = 100;
-const GRID_CELLSPACE: u8 = 1;
-const LOAD_COL_OFFSET: u8 = 10;
-const LOAD_ROW_OFFSET: u8 = 10;
-const TESTSHIFT: u8 = 5;
-const X_OFFSSET: u8 = 200;
-const Y_OFFSET: u8 = 25;
+
+// TODO this is the stuff inherited from the orig.
+// const BORDER_OFFSET: u8 = 25;
+// const GRID_CELLSPACE: u8 = 1;
+// const LOAD_COL_OFFSET: u8 = 10;
+// const LOAD_ROW_OFFSET: u8 = 10;
+// const TESTSHIFT: u8 = 5;
+// const X_OFFSSET: u8 = 200;
+// const Y_OFFSET: u8 = 25;
 
 /// The data structure holding the universe state.
-struct Grid {
-	items: Vec<Vec<bool>>,
+pub struct Grid {
+	pub cells: Vec<Vec<bool>>,
 }
 
 impl Grid {
 	/// Instantiate an empty [`Grid`].
 	pub fn new(rows: usize, cols: usize) -> Self {
-		let items = vec![vec![false; cols]; rows];
-		Self { items }
+		let cells = vec![vec![false; cols]; rows];
+		Self { cells }
 	}
 
-	/// Retrieve the current value at the given location.
+	/// Retrieve the value of the given cell.
 	pub fn get(&self, row: usize, col: usize) -> bool {
-		self.items[row][col]
+		self.cells[row][col]
 	}
 
-	/// Retreive the total length of this [`Grid`].
-	pub fn len(&self) -> usize {
-		self.items[0].len() * self.items.len()
+	/// Set the value at the given cell.
+	pub fn set(&mut self, row: usize, col: usize, val: bool) {
+		self.cells[row][col] = val;
 	}
 }
 
@@ -40,42 +42,18 @@ impl Default for Grid {
 	}
 }
 
-impl IntoIterator for Grid {
-	type Item = bool;
-	type IntoIter = GridIter;
-	fn into_iter(self) -> Self::IntoIter {
-		GridIter {
-			grid: self,
-			col: 0,
-			row: 0,
-		}
-	}
-}
-
-struct GridIter {
-	grid: Grid,
-	col: usize,
-	row: usize,
-}
-
-impl Iterator for GridIter {
-	type Item = bool;
-	fn next(&mut self) -> Option<Self::Item> {
-		let ret = self.grid.get(self.row, self.col);
-		todo!()
-	}
-}
-
 /// The `Grid` handles the Game of Life universe.
 pub struct Universe {
-	map: Grid,
+	/// The state of the universe.
+	pub map: Grid,
+	/// Internal map for computing the next generation.
 	switchmap: Grid,
 	/// The number of rows in the grid.
 	pub rows: usize,
 	/// The number of columns in the grid.
 	pub cols: usize,
 	/// The size of each individual grid square.
-	pub cell_size: usize,
+	pub cell_size: u8,
 	/// Generation counter.
 	pub gen_count: usize,
 }
@@ -83,72 +61,105 @@ pub struct Universe {
 impl Universe {
 	/// Instantiate a new `Grid`.
 	pub fn new() -> Self {
-		Self::default()
+		let mut universe = Self::default();
+		universe.randomize();
+		universe
 	}
 
 	/// Clear the grid
 	pub fn clear(&mut self) {
 		self.map = Grid::new(self.rows, self.cols);
 		self.switchmap = Grid::new(self.rows, self.cols);
+		self.gen_count = 0;
 	}
 
 	/// Compute a generation.
 	pub fn advance_generation(&mut self) {
 		self.gen_count += 1;
 
-		// Iteratate over cells
-		// switchmap[r][c] = map[r + TESTSHIFT][c + TESTSHIFT]
+		// Iterate over cells
+		#[allow(clippy::cast_possible_wrap)]
+		for row in 0..self.rows as isize {
+			let urow = row.try_into().unwrap();
+			#[allow(clippy::cast_possible_wrap)]
+			for col in 0..self.cols as isize {
+				let ucol = col.try_into().unwrap();
+				// Determine number of neighbors.
+				let mut n = 0;
+				for r1 in -1..2isize {
+					for c1 in -1..2isize {
+						if !(r1 == 0 && c1 == 0)
+							&& ((row + r1 >= 0)
+								&& (col + c1 >= 0) && (row + r1 < self.rows.try_into().unwrap())
+								&& (col + c1 < self.cols.try_into().unwrap()))
+							&& self.map.get(
+								(row + r1).try_into().unwrap(),
+								(col + c1).try_into().unwrap(),
+							) {
+							n += 1;
+						}
+					}
+				}
 
-		// for row in self.map.into_iter() {
-		// 	todo!()
-		// }
+				self.switchmap.set(urow, ucol, false);
+				let current_state = self.map.get(urow, ucol);
+				if (n < 2) && current_state {
+					self.switchmap.set(urow, ucol, false);
+				} else if ((n == 2) || (n == 3)) && current_state {
+					self.switchmap.set(urow, ucol, true);
+				} else if (n > 3) && self.map.get(urow, ucol) {
+					self.switchmap.set(urow, ucol, false);
+				} else if !current_state && n == 3 {
+					self.switchmap.set(urow, ucol, true);
+				}
+			}
+		}
+
+		// Copy back to main grid map.
+		for (row_idx, row) in self.switchmap.cells.iter().enumerate() {
+			for (col_idx, &state) in row.iter().enumerate() {
+				self.map.set(row_idx, col_idx, state);
+			}
+		}
 	}
 
-	/// Run infinitely.
-	// TODO - I think this is the renderer's job, or at least main
-	// pub fn run(&mut self) {
-	// 	todo!()
-	// }
-
 	/// Resize the grid dimensions and re-instantiate.
-	pub fn resize(&mut self, columns: usize, rows: usize, cell_size: usize) {
+	pub fn resize(&mut self, columns: usize, rows: usize, cell_size: u8) {
 		self.cols = columns;
 		self.rows = rows;
 		self.cell_size = cell_size;
 		self.map = Grid::new(self.rows, self.cols);
 		self.switchmap = Grid::new(self.rows, self.cols);
+		self.gen_count = 0;
 		self.randomize();
 	}
 
-	/// I dont know why we need this either
-	fn set_grid(&mut self, row: usize, col: usize) {
-		todo!()
-	}
+	// /// I dont know why we need this either
+	// fn set_grid(&mut self, row: usize, col: usize) {
+	// 	todo!()
+	// }
 
-	/// Set a point, computing offsets and cellsize.
-	// TODO - this method deals with translating mouse coords to grid coords.  Where does it belong?
-	pub fn set_point(&self, row: usize, col: usize) {
-		todo!()
-	}
+	// /// Set a point, computing offsets and cellsize.
+	// // TODO - this method deals with translating mouse coords to grid coords.  Where does it belong?
+	// pub fn set_point(&self, row: usize, col: usize) {
+	// 	todo!()
+	// }
 
-	/// Toggle the state.
-	// TODO what does this do?
-	pub fn toggle(&mut self) {
-		todo!()
-	}
-
-	// I think this will be a method on Renderer.
-	// /// Draw the grid
-	// pub fn draw(&self) {
+	// /// Toggle the state.
+	// // TODO what does this do?
+	// pub fn toggle(&mut self) {
 	// 	todo!()
 	// }
 
 	/// Populate the grid with random live squares.
 	fn randomize(&mut self) {
-		// for cell in self.iter_mut() {
-		// 	todo!()
-		// }
-		todo!()
+		for row in &mut self.map.cells {
+			for cell in row {
+				// Each cell has a 1/3 change to live.
+				let rand = rand::thread_rng().gen_range(0..3);
+				*cell = rand == 1;
+			}
+		}
 	}
 }
 
@@ -159,7 +170,7 @@ impl Default for Universe {
 			switchmap: Grid::default(),
 			rows: DEFAULT_ROWS,
 			cols: DEFAULT_COLS,
-			cell_size: 10,
+			cell_size: DEFAULT_CELL_SIZE,
 			gen_count: 0,
 		}
 	}
