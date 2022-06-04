@@ -9,7 +9,6 @@ use eframe::{
 pub struct EguiApp {
 	app: crate::app::App,
 	picked_path: Option<String>,
-	running: bool,
 }
 
 impl EguiApp {
@@ -19,22 +18,16 @@ impl EguiApp {
 		Self {
 			app: crate::app::App::new(),
 			picked_path: None,
-			running: false,
 		}
 	}
 
 	fn run_button_text(&self) -> RichText {
-		let (text, color) = if self.running {
+		let (text, color) = if self.app.running {
 			("Stop", Color32::RED)
 		} else {
 			("Run", Color32::GREEN)
 		};
 		RichText::new(text).color(color).size(20.0)
-	}
-
-	fn toggle_running(&mut self) {
-		// TODO - move the whole universe to a separate thread?
-		self.running = !self.running;
 	}
 }
 
@@ -61,7 +54,7 @@ impl eframe::App for EguiApp {
 						self.app.universe.advance_generation();
 					}
 					if ui.button(self.run_button_text()).clicked() {
-						self.toggle_running();
+						self.app.toggle_running();
 					}
 				});
 				ui.menu_button("Help", |ui| {
@@ -101,7 +94,7 @@ impl eframe::App for EguiApp {
 			});
 			ui.separator();
 			if ui.button(self.run_button_text()).clicked() {
-				self.toggle_running();
+				self.app.toggle_running();
 			}
 			if ui.button("One Generation").clicked() {
 				self.app.universe.advance_generation();
@@ -144,7 +137,7 @@ impl eframe::App for EguiApp {
 			let painter = ui.painter();
 			painter.extend(shapes);
 		});
-		if self.running {
+		if self.app.running {
 			self.app.universe.advance_generation();
 		}
 	}

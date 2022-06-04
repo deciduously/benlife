@@ -2,10 +2,9 @@
 
 use crate::universe::{Universe, DEFAULT_CELL_SIZE};
 
-// TODO - this seems kind of useless?  Keep it for now, might be useful to add another renderer.
-
 pub struct App {
 	pub next_cell_size: u8,
+	pub running: bool,
 	pub universe: Universe,
 }
 
@@ -15,6 +14,7 @@ impl App {
 	pub fn new() -> Self {
 		Self {
 			next_cell_size: DEFAULT_CELL_SIZE,
+			running: false,
 			universe: Universe::new(),
 		}
 	}
@@ -23,5 +23,11 @@ impl App {
 	pub fn new_grid(&mut self) {
 		self.universe
 			.resize(self.universe.cols, self.universe.rows, self.next_cell_size);
+	}
+
+	/// Start or stop the app.
+	pub fn toggle_running(&mut self) {
+		// TODO - move the whole universe to a separate thread?
+		self.running = !self.running;
 	}
 }
