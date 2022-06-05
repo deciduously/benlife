@@ -4,6 +4,7 @@ use eframe::emath::Vec2;
 
 mod app;
 mod render;
+mod rle;
 mod universe;
 
 fn main() {

@@ -56,6 +56,8 @@ pub struct Universe {
 	pub cell_size: u8,
 	/// Generation counter.
 	pub gen_count: usize,
+	/// Various metadata about the universe.
+	pub metadata: Metadata,
 }
 
 impl Universe {
@@ -172,6 +174,38 @@ impl Default for Universe {
 			cols: DEFAULT_COLS,
 			cell_size: DEFAULT_CELL_SIZE,
 			gen_count: 0,
+			metadata: Metadata::default(),
 		}
+	}
+}
+
+#[derive(Default)]
+pub struct Metadata {
+	pub author: Option<String>,
+	pub name: Option<String>,
+	pub comments: Vec<String>,
+	pub ruleset: Ruleset,
+}
+
+/// The pattern to use to compute generations.
+#[derive(Debug)]
+pub enum Ruleset {
+	Life,
+	// HighLife,
+}
+
+impl Default for Ruleset {
+	fn default() -> Self {
+		Ruleset::Life
+	}
+}
+
+impl std::fmt::Display for Ruleset {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let s = match self {
+			Ruleset::Life => "B3/S23",
+			// Ruleset::HighLife => "B36/S23",
+		};
+		write!(f, "{s}")
 	}
 }

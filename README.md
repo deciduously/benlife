@@ -4,12 +4,14 @@ A Rust reimplementation of [`danlife`](https://danlovy.com/life/), for kicks.
 
 ## TODO
 
-- [ ] Editing
-- [ ] Loading
-- [ ] Saving
+- [ ] Editing universe grapically
+- [ ] Loading [RLE](https://conwaylife.com/wiki/Run_Length_Encoded) files
+- [ ] Saving RLE files
 - [ ] Keyboard Commands
 - [ ] Multithreading
 - [ ] Pop-up windows
+- [ ] Support alternate patterns like HighLife.
+- [ ] Support [apgcode](https://conwaylife.com/wiki/Apgcode)
 
 ## Comparison
 
