@@ -111,6 +111,10 @@ impl EguiApp {
 							.set_description(&format!("{} saved successfully", path.display()));
 					}
 				}
+				if ui.button("Exit").clicked() {
+					// TODO - shut down child process!
+					std::process::exit(0);
+				}
 			});
 			ui.menu_button("Life", |ui| {
 				if ui.button("Run Generation").clicked() {
