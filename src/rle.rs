@@ -2,12 +2,11 @@
 //!
 //! <https://conwaylife.com/wiki/Run_Length_Encoded>
 
+use crate::universe::Universe;
 use std::{
-	io::{self, BufRead, BufReader, BufWriter, Read, Write},
+	io::{self, BufRead, BufReader, BufWriter},
 	path::Path,
 };
-
-use crate::universe::Universe;
 
 /// Deserialize a [`Universe`] from a file.
 pub fn from_file(path: impl AsRef<Path>) -> io::Result<Universe> {
@@ -40,7 +39,7 @@ pub fn to_writer(universe: &Universe, writer: &mut impl io::Write) -> io::Result
 	let ruleset = universe.metadata.ruleset.to_string();
 	writeln!(writer, "x = {x}, y = {y}, rule = {ruleset}")?;
 	// Write grid.
-	for row in &universe.map.cells {
+	for row in &universe.generation.read().map.cells {
 		for &col in row {
 			let c = if col { 'b' } else { 'o' };
 			write!(writer, "{c}")?;
@@ -60,5 +59,5 @@ pub fn to_file(universe: &Universe, path: impl AsRef<Path>) -> io::Result<()> {
 
 #[cfg(test)]
 mod test {
-	use super::*;
+	// use super::*;
 }

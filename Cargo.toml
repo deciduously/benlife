@@ -9,8 +9,10 @@ repository = "https://github.com/deciduously/benlife"
 version = "0.1.0"
 
 [dependencies]
+crossbeam = "0.8"
 eframe = "0.18"
 image = "0.24"
+parking_lot = "0.12"
 rand = "0.8"
 rfd = "0.8"
 

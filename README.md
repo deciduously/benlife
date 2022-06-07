@@ -12,6 +12,7 @@ A Rust reimplementation of [`danlife`](https://danlovy.com/life/), for kicks.
 - [ ] Pop-up windows
 - [ ] Support alternate patterns like HighLife.
 - [ ] Support [apgcode](https://conwaylife.com/wiki/Apgcode)
+- [ ] Handle panics.
 
 ## Comparison
 

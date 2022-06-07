@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 use rand::Rng;
 
 pub const DEFAULT_CELL_SIZE: u8 = 10;
@@ -25,6 +28,11 @@ impl Grid {
 		Self { cells }
 	}
 
+	/// Reset this grid to default.
+	pub fn clear(&mut self) {
+		*self = Self::new(self.cells.len(), self.cells[0].len());
+	}
+
 	/// Retrieve the value of the given cell.
 	pub fn get(&self, row: usize, col: usize) -> bool {
 		self.cells[row][col]
@@ -44,40 +52,42 @@ impl Default for Grid {
 
 /// The `Grid` handles the Game of Life universe.
 pub struct Universe {
-	/// The state of the universe.
-	pub map: Grid,
+	/// Pointer to state of the universe.
+	pub generation: Arc<RwLock<Generation>>,
 	/// Internal map for computing the next generation.
 	switchmap: Grid,
 	/// The number of rows in the grid.
 	pub rows: usize,
 	/// The number of columns in the grid.
 	pub cols: usize,
-	/// The size of each individual grid square.
-	pub cell_size: u8,
-	/// Generation counter.
-	pub gen_count: usize,
 	/// Various metadata about the universe.
 	pub metadata: Metadata,
 }
 
 impl Universe {
 	/// Instantiate a new `Grid`.
-	pub fn new() -> Self {
-		let mut universe = Self::default();
+	pub fn new(generation: Arc<RwLock<Generation>>) -> Self {
+		let mut universe = Universe {
+			generation,
+			switchmap: Grid::default(),
+			rows: DEFAULT_ROWS,
+			cols: DEFAULT_COLS,
+			metadata: Metadata::default(),
+		};
 		universe.randomize();
 		universe
 	}
 
 	/// Clear the grid
 	pub fn clear(&mut self) {
-		self.map = Grid::new(self.rows, self.cols);
-		self.switchmap = Grid::new(self.rows, self.cols);
-		self.gen_count = 0;
+		self.generation.write().reset();
+		self.switchmap.clear();
 	}
 
 	/// Compute a generation.
 	pub fn advance_generation(&mut self) {
-		self.gen_count += 1;
+		self.generation.write().gen_count += 1;
+		let read_lock = self.generation.read();
 
 		// Iterate over cells
 		#[allow(clippy::cast_possible_wrap)]
@@ -94,7 +104,7 @@ impl Universe {
 							&& ((row + r1 >= 0)
 								&& (col + c1 >= 0) && (row + r1 < self.rows.try_into().unwrap())
 								&& (col + c1 < self.cols.try_into().unwrap()))
-							&& self.map.get(
+							&& read_lock.map.get(
 								(row + r1).try_into().unwrap(),
 								(col + c1).try_into().unwrap(),
 							) {
@@ -104,23 +114,25 @@ impl Universe {
 				}
 
 				self.switchmap.set(urow, ucol, false);
-				let current_state = self.map.get(urow, ucol);
+				let current_state = read_lock.map.get(urow, ucol);
 				if (n < 2) && current_state {
 					self.switchmap.set(urow, ucol, false);
 				} else if ((n == 2) || (n == 3)) && current_state {
 					self.switchmap.set(urow, ucol, true);
-				} else if (n > 3) && self.map.get(urow, ucol) {
+				} else if (n > 3) && read_lock.map.get(urow, ucol) {
 					self.switchmap.set(urow, ucol, false);
 				} else if !current_state && n == 3 {
 					self.switchmap.set(urow, ucol, true);
 				}
 			}
 		}
+		drop(read_lock);
 
 		// Copy back to main grid map.
+		let mut write_lock = self.generation.write();
 		for (row_idx, row) in self.switchmap.cells.iter().enumerate() {
 			for (col_idx, &state) in row.iter().enumerate() {
-				self.map.set(row_idx, col_idx, state);
+				write_lock.map.set(row_idx, col_idx, state);
 			}
 		}
 	}
@@ -129,10 +141,12 @@ impl Universe {
 	pub fn resize(&mut self, columns: usize, rows: usize, cell_size: u8) {
 		self.cols = columns;
 		self.rows = rows;
-		self.cell_size = cell_size;
-		self.map = Grid::new(self.rows, self.cols);
-		self.switchmap = Grid::new(self.rows, self.cols);
-		self.gen_count = 0;
+		{
+			let mut write_lock = self.generation.write();
+			write_lock.reset();
+			write_lock.cell_size = cell_size;
+		}
+		self.switchmap.clear();
 		self.randomize();
 	}
 
@@ -155,7 +169,7 @@ impl Universe {
 
 	/// Populate the grid with random live squares.
 	fn randomize(&mut self) {
-		for row in &mut self.map.cells {
+		for row in &mut self.generation.write().map.cells {
 			for cell in row {
 				// Each cell has a 1/3 change to live.
 				let rand = rand::thread_rng().gen_range(0..3);
@@ -165,17 +179,25 @@ impl Universe {
 	}
 }
 
-impl Default for Universe {
-	fn default() -> Self {
-		Universe {
-			map: Grid::default(),
-			switchmap: Grid::default(),
-			rows: DEFAULT_ROWS,
-			cols: DEFAULT_COLS,
+/// A single frame of the universe and the current generation count.
+#[derive(Default)]
+pub struct Generation {
+	pub cell_size: u8,
+	pub map: Grid,
+	pub gen_count: usize,
+}
+
+impl Generation {
+	pub fn new() -> Self {
+		Self {
 			cell_size: DEFAULT_CELL_SIZE,
-			gen_count: 0,
-			metadata: Metadata::default(),
+			..Default::default()
 		}
+	}
+
+	pub fn reset(&mut self) {
+		self.map.clear();
+		self.gen_count = 0;
 	}
 }
 
