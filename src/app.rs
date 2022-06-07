@@ -1,39 +1,30 @@
 //! The `App` is responsible for owning and manipulating a Game of Life [`Universe`].
 
-use parking_lot::RwLock;
-
-use crate::universe::{Generation, Universe};
+use crate::{universe::Universe, Context};
 use crossbeam::channel;
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc,
-};
+use std::sync::{atomic::Ordering, Arc};
 
-pub struct App {
-	running: Arc<AtomicBool>,
+pub(crate) struct App {
+	context: Arc<Context>,
 	ui_receiver: channel::Receiver<Message>,
-	pub universe: Universe,
+	universe: Universe,
 }
 
 impl App {
 	/// Instantiate a new `App`.
 	#[must_use]
-	pub fn new(
-		ui_receiver: channel::Receiver<Message>,
-		running: Arc<AtomicBool>,
-		shared_map: Arc<RwLock<Generation>>,
-	) -> Self {
+	pub fn new(ui_receiver: channel::Receiver<Message>, context: Arc<Context>) -> Self {
+		let universe_context = Arc::clone(&context);
 		Self {
-			running,
+			context,
 			ui_receiver,
-			universe: Universe::new(shared_map),
+			universe: Universe::new(universe_context),
 		}
 	}
 
 	/// Reset the grid using the next cell size.
 	pub fn new_grid(&mut self, next_cell_size: u8) {
-		self.universe
-			.resize(self.universe.cols, self.universe.rows, next_cell_size);
+		self.universe.reset(next_cell_size);
 	}
 
 	/// Run the app forever.  Use messages to start or stop the application.
@@ -44,7 +35,7 @@ impl App {
 				match msg {
 					Message::AdvanceOne => {
 						// Don't bother if the user clicks while the app is running.
-						if !self.running.load(Ordering::Relaxed) {
+						if !self.context.running.load(Ordering::Relaxed) {
 							self.universe.advance_generation();
 						}
 					},
@@ -54,7 +45,7 @@ impl App {
 				}
 			}
 			// If we're in run mode, step forward.
-			if self.running.load(Ordering::Relaxed) {
+			if self.context.running.load(Ordering::Relaxed) {
 				self.universe.advance_generation();
 			}
 		}

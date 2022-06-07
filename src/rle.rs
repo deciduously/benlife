@@ -9,7 +9,7 @@ use std::{
 };
 
 /// Deserialize a [`Universe`] from a file.
-pub fn from_file(path: impl AsRef<Path>) -> io::Result<Universe> {
+pub(crate) fn from_file(path: impl AsRef<Path>) -> io::Result<Universe> {
 	let file = std::fs::File::open(&path)?;
 	let reader = BufReader::new(file);
 	let lines = reader.lines();
@@ -22,7 +22,7 @@ pub fn from_file(path: impl AsRef<Path>) -> io::Result<Universe> {
 }
 
 /// Serialize a [`Universe`] to a writer.
-pub fn to_writer(universe: &Universe, writer: &mut impl io::Write) -> io::Result<()> {
+pub(crate) fn to_writer(universe: &Universe, writer: &mut impl io::Write) -> io::Result<()> {
 	// Write metadata.
 	if let Some(name) = &universe.metadata.name {
 		writeln!(writer, "#N {name}")?;
@@ -39,7 +39,7 @@ pub fn to_writer(universe: &Universe, writer: &mut impl io::Write) -> io::Result
 	let ruleset = universe.metadata.ruleset.to_string();
 	writeln!(writer, "x = {x}, y = {y}, rule = {ruleset}")?;
 	// Write grid.
-	for row in &universe.generation.read().map.cells {
+	for row in &universe.context.shared_gen.read().map.cells {
 		for &col in row {
 			let c = if col { 'b' } else { 'o' };
 			write!(writer, "{c}")?;
@@ -50,7 +50,7 @@ pub fn to_writer(universe: &Universe, writer: &mut impl io::Write) -> io::Result
 	Ok(())
 }
 
-pub fn to_file(universe: &Universe, path: impl AsRef<Path>) -> io::Result<()> {
+pub(crate) fn to_file(universe: &Universe, path: impl AsRef<Path>) -> io::Result<()> {
 	let f = std::fs::File::open(&path)?;
 	let mut writer = BufWriter::new(f);
 	to_writer(universe, &mut writer)?;

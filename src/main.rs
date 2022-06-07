@@ -1,9 +1,12 @@
 #![warn(clippy::pedantic)]
 
-use eframe::emath::Vec2;
 use crossbeam::channel;
+use eframe::emath::Vec2;
 use parking_lot::RwLock;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{
+	atomic::{AtomicBool, AtomicU8},
+	Arc,
+};
 
 mod app;
 mod render;
@@ -11,50 +14,67 @@ mod rle;
 mod universe;
 
 use app::App;
-use universe::Generation;
+use universe::{Generation, DEFAULT_CELL_SIZE};
 
+/*
+- Set up native GUI integration options.
+- Instantiate thread-safe universe location.
+	- An `Arc<T>` is an atomic reference-counted pointer.  It can be shared safely across threads.
+		-`Arc::clone()` creates a new reference to the same heap value, increasing the reference count.
+		- Heap memory is freed when the reference count hits zero.
+	- `RwLock` is a synchronization primitive which allows multiple concurrent readers or a single writer, not both.
+	- Threads will block on calls to `read()` or `write()` until the lock is available.
+- Similarly, use an atomic types to coordinate on some shared context.
+- Set up channel to communicate between the simulation and UI threads.
+	- Uses a multi-producer, multi-consumer channel with a channel size of 0.
+		- This channel will block on sends waiting for the buffer to open up.
+		- With a buffer size of 0, `send` won't return until `recv` is called.
+- Spawn simulation thread.
+- Kick off the GUI.
+ */
 fn main() {
-	// Set up native GUI integration options.
 	let native_options = native_options();
-
-	// Instantiate thread-safe universe location.
-	// An `Arc<T>` is an atomic reference-counted pointer.  It can be shared safely across threads.
-	// `Arc::clone()` creates a new reference to the same heap value, increasing the reference count.
-	// Heap memory is freed when the reference count hits zero.
-	// `RwLock` is a synchronization primitive which allows multiple concurrent readers or a single writer, not both.
-	// Threads will block on calls to `read()` or `write()` until the lock is available.
-	let shared_gen = Arc::new(RwLock::new(Generation::new()));
-
-	// Similarly, use an AtomicBool to coordinate on whether the app is in run mode.
-	let running = Arc::new(AtomicBool::new(false));
-
-	// Set up channel to communicate between the simulation and UI threads.
-	// Uses a multi-producer, multi-consumer channel with a channel size of 0.
-	// This channel will block on sends waiting for the buffer to open up.
-	// With a buffer size of 0, `send` won't return until `recv` is called.
-	// The app will only wait 1ms per frame before giving up and checking again next frame.
+	let context = Arc::new(Context::default());
 	let (app_sender, ui_receiver) = channel::bounded(0);
-
-	// Spawn simulation thread.
 	{
-		// Grab scope-local handles to the shared data for the thread.
-		let shared_gen = Arc::clone(&shared_gen);
-		let running = Arc::clone(&running);
+		let context = Arc::clone(&context);
 		std::thread::spawn(move || {
-			let mut app = App::new(ui_receiver, running, shared_gen);
+			let mut app = App::new(ui_receiver, context);
 			app.run();
 		});
 	}
-
-	// Kick off the GUI.
 	eframe::run_native(
 		"Life of Ben",
 		native_options,
-		Box::new(|cc| Box::new(render::EguiApp::new(cc, app_sender, running, shared_gen))),
+		Box::new(|cc| Box::new(render::EguiApp::new(cc, app_sender, context))),
 	);
 }
 
+/// Data that's shared between threads.
+pub(crate) struct Context {
+	/// The current universe's cell size.
+	cell_size: AtomicU8,
+	/// A single generation of the universe, with its generation number.
+	shared_gen: RwLock<Generation>,
+	/// Whether the simulation is in run mode.
+	running: AtomicBool,
+	/// The current user speed setting,
+	speed: AtomicU8,
+}
+
+impl Default for Context {
+	fn default() -> Self {
+		Self {
+			cell_size: AtomicU8::new(DEFAULT_CELL_SIZE),
+			shared_gen: RwLock::new(Generation::new()),
+			running: AtomicBool::new(false),
+			speed: AtomicU8::new(50),
+		}
+	}
+}
+
 fn load_icon() -> eframe::IconData {
+	// `include_bytes!()` slurps up the file as a chunk o' bytes in the EXE data section.
 	let bytes = include_bytes!("../Life of Dan.ico");
 	let icon = image::io::Reader::new(std::io::Cursor::new(bytes))
 		.with_guessed_format()

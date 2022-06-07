@@ -1,27 +1,19 @@
 //! Swappable GUI.
 
-use crate::{
-	app::Message,
-	universe::{Generation, DEFAULT_CELL_SIZE},
-};
+use crate::{app::Message, universe::DEFAULT_CELL_SIZE, Context};
 use crossbeam::channel;
 use eframe::{
 	egui::{self, RichText},
 	emath::{Pos2, Vec2},
 	epaint::{Color32, RectShape, Rounding},
 };
-use parking_lot::RwLock;
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc,
-};
+use std::sync::{atomic::Ordering, Arc};
 
-pub struct EguiApp {
+pub(crate) struct EguiApp {
 	app_sender: channel::Sender<Message>,
+	context: Arc<Context>,
 	picked_path: Option<String>,
 	next_cell_size: u8,
-	running: Arc<AtomicBool>,
-	shared_gen: Arc<RwLock<Generation>>,
 }
 
 impl EguiApp {
@@ -29,16 +21,14 @@ impl EguiApp {
 	pub fn new(
 		_cc: &eframe::CreationContext<'_>,
 		app_sender: channel::Sender<Message>,
-		running: Arc<AtomicBool>,
-		shared_gen: Arc<RwLock<Generation>>,
+		context: Arc<Context>,
 	) -> Self {
 		// fonts, visuals, cc.storage
 		Self {
 			app_sender,
+			context,
 			picked_path: None,
 			next_cell_size: DEFAULT_CELL_SIZE,
-			running,
-			shared_gen,
 		}
 	}
 
@@ -49,7 +39,7 @@ impl EguiApp {
 				.as_ref()
 				.unwrap_or(&"Nothing picked!".to_owned()),
 		);
-		let generation_count = self.shared_gen.read().gen_count;
+		let generation_count = self.context.shared_gen.read().gen_count;
 		ui.label(format!("Generation count: {generation_count}"));
 
 		ui.group(|ui| {
@@ -68,10 +58,19 @@ impl EguiApp {
 			}
 		});
 		ui.separator();
-		if ui.button(self.run_button_text()).clicked() {
-			let current = self.running.load(Ordering::Relaxed);
-			self.running.swap(!current, Ordering::Relaxed);
-		}
+		ui.group(|ui| {
+			let mut speed = self.context.speed.load(Ordering::Relaxed);
+			if ui
+				.add(egui::Slider::new(&mut speed, 1..=100).text("Speed"))
+				.changed()
+			{
+				self.context.speed.swap(speed, Ordering::Relaxed);
+			}
+			if ui.button(self.run_button_text()).clicked() {
+				let current = self.context.running.load(Ordering::Relaxed);
+				self.context.running.swap(!current, Ordering::Relaxed);
+			}
+		});
 		if ui.button("One Generation").clicked() {
 			self.app_sender.send(Message::AdvanceOne).unwrap();
 		}
@@ -86,7 +85,12 @@ impl EguiApp {
 		// It should stay the same size overall.
 		// Paint the grid, one rectangle at a time.
 		let mut shapes = Vec::new();
-		let cell_size = self.shared_gen.read().cell_size.try_into().unwrap();
+		let cell_size = self
+			.context
+			.cell_size
+			.load(Ordering::Relaxed)
+			.try_into()
+			.unwrap();
 		let dimensions = Vec2::splat(cell_size);
 
 		// Compute the UI region's top left coordinate
@@ -94,7 +98,7 @@ impl EguiApp {
 		let x_offset = panel_top_left.x;
 		let y_offset = panel_top_left.y;
 
-		for (row_idx, row) in self.shared_gen.read().map.cells.iter().enumerate() {
+		for (row_idx, row) in self.context.shared_gen.read().map.cells.iter().enumerate() {
 			for (col_idx, &cell) in row.iter().enumerate() {
 				if cell {
 					#[allow(clippy::cast_precision_loss)]
@@ -145,8 +149,8 @@ impl EguiApp {
 					self.app_sender.send(Message::AdvanceOne).unwrap();
 				}
 				if ui.button(self.run_button_text()).clicked() {
-					let current = self.running.load(Ordering::Relaxed);
-					self.running.swap(!current, Ordering::Relaxed);
+					let current = self.context.running.load(Ordering::Relaxed);
+					self.context.running.swap(!current, Ordering::Relaxed);
 				}
 			});
 			ui.menu_button("Help", |ui| {
@@ -164,7 +168,7 @@ impl EguiApp {
 	}
 
 	fn run_button_text(&self) -> RichText {
-		let (text, color) = if self.running.load(Ordering::Relaxed) {
+		let (text, color) = if self.context.running.load(Ordering::Relaxed) {
 			("Stop", Color32::RED)
 		} else {
 			("Run", Color32::GREEN)
@@ -178,8 +182,5 @@ impl eframe::App for EguiApp {
 		egui::TopBottomPanel::top("topbar_menus").show(ctx, |ui| self.topbar(ctx, ui));
 		egui::SidePanel::left("controls").show(ctx, |ui| self.control_panel(ui));
 		egui::CentralPanel::default().show(ctx, |ui| self.main_panel(ui));
-		// if self.app.running {
-		// 	self.app.universe.advance_generation();
-		// }
 	}
 }
