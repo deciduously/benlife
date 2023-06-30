@@ -33,7 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// This channel will block on sends waiting for the buffer to open up.
 	// With a buffer size of 0, `send` won't return until `recv` is called.
 	// The app will only wait 1ms per frame before giving up and checking again next frame.
-	let (app_sender, ui_receiver) = channel::bounded(0);
+	let (app_sender, ui_receiver) = channel::unbounded();
+	let (ui_sender, app_receiver) = channel::unbounded();
 
 	// Spawn simulation thread.
 	{
@@ -41,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let shared_gen = Arc::clone(&shared_gen);
 		let running = Arc::clone(&running);
 		std::thread::spawn(move || {
-			let mut app = App::new(ui_receiver, running, shared_gen);
+			let mut app = App::new(ui_sender, ui_receiver, running, shared_gen);
 			app.run();
 		});
 	}
@@ -50,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	eframe::run_native(
 		"Life of Ben",
 		native_options,
-		Box::new(|cc| Box::new(render::EguiApp::new(cc, app_sender, running, shared_gen))),
+		Box::new(|cc| Box::new(render::EguiApp::new(cc, app_sender, app_receiver,  running, shared_gen))),
 	)?;
 
 	Ok(())

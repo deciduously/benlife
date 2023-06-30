@@ -11,7 +11,8 @@ use std::sync::{
 
 pub struct App {
 	running: Arc<AtomicBool>,
-	ui_receiver: channel::Receiver<Message>,
+	sender: channel::Sender<ToUiMeg>,
+	receiver: channel::Receiver<FromUiMsg>,
 	pub universe: Universe,
 }
 
@@ -19,13 +20,15 @@ impl App {
 	/// Instantiate a new `App`.
 	#[must_use]
 	pub fn new(
-		ui_receiver: channel::Receiver<Message>,
+		sender: channel::Sender<ToUiMeg>,
+		receiver: channel::Receiver<FromUiMsg>,
 		running: Arc<AtomicBool>,
 		shared_map: Arc<RwLock<Generation>>,
 	) -> Self {
 		Self {
 			running,
-			ui_receiver,
+			sender,
+			receiver,
 			universe: Universe::new(shared_map),
 		}
 	}
@@ -40,31 +43,37 @@ impl App {
 	pub fn run(&mut self) {
 		loop {
 			// Check if there was a UI interaction.
-			if let Ok(msg) = self.ui_receiver.try_recv() {
+			if let Ok(msg) = self.receiver.try_recv() {
 				match msg {
-					Message::AdvanceOne => {
+					FromUiMsg::AdvanceOne => {
 						// Don't bother if the user clicks while the app is running.
-						if !self.running.load(Ordering::Relaxed) {
 							self.universe.advance_generation();
-						}
 					},
-					Message::Clear => self.universe.clear(),
-					Message::NewGrid(cell_size) => self.new_grid(cell_size),
-					Message::Shutdown => break,
+					FromUiMsg::Clear => self.universe.clear(),
+					FromUiMsg::NewGrid(cell_size) => self.new_grid(cell_size),
+					FromUiMsg::Shutdown => break,
 				}
 			}
 			// If we're in run mode, step forward.
-			if self.running.load(Ordering::Relaxed) {
+			if self.running.load(Ordering::SeqCst) {
 				self.universe.advance_generation();
+				let result = self.sender.try_send(ToUiMeg::Repaint);
+				if let Err(e) = result {
+					eprintln!("[{:?}] Failed to send repaint message to UI thread: {e}.", std::time::SystemTime::now());
+				}
 			}
 		}
 	}
 }
 
 /// The possible messages the UI can send.
-pub enum Message {
+pub enum FromUiMsg {
 	AdvanceOne,
 	Clear,
 	NewGrid(u8),
 	Shutdown,
+}
+
+pub enum ToUiMeg {
+	Repaint
 }

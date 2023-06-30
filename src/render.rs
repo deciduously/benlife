@@ -1,7 +1,7 @@
 //! Swappable GUI.
 
 use crate::{
-	app::Message,
+	app::{FromUiMsg, ToUiMeg},
 	universe::{Generation, DEFAULT_CELL_SIZE},
 };
 use crossbeam::channel;
@@ -17,7 +17,8 @@ use std::sync::{
 };
 
 pub struct EguiApp {
-	app_sender: channel::Sender<Message>,
+	sender: channel::Sender<FromUiMsg>,
+	receiver: channel::Receiver<ToUiMeg>,
 	picked_path: Option<String>,
 	next_cell_size: u8,
 	running: Arc<AtomicBool>,
@@ -28,13 +29,15 @@ impl EguiApp {
 	#[must_use]
 	pub fn new(
 		_cc: &eframe::CreationContext<'_>,
-		app_sender: channel::Sender<Message>,
+		sender: channel::Sender<FromUiMsg>,
+		receiver: channel::Receiver<ToUiMeg>,
 		running: Arc<AtomicBool>,
 		shared_gen: Arc<RwLock<Generation>>,
 	) -> Self {
 		// fonts, visuals, cc.storage
 		Self {
-			app_sender,
+			sender,
+			receiver,
 			picked_path: None,
 			next_cell_size: DEFAULT_CELL_SIZE,
 			running,
@@ -62,8 +65,8 @@ impl EguiApp {
 				}
 			}
 			if ui.button("New Grid").clicked() {
-				self.app_sender
-					.send(Message::NewGrid(self.next_cell_size))
+				self.sender
+					.send(FromUiMsg::NewGrid(self.next_cell_size))
 					.unwrap();
 			}
 		});
@@ -73,14 +76,14 @@ impl EguiApp {
 			self.running.swap(!current, Ordering::Relaxed);
 		}
 		if ui.button("One Generation").clicked() {
-			self.app_sender.send(Message::AdvanceOne).unwrap();
+			self.sender.send(FromUiMsg::AdvanceOne).unwrap();
 		}
 		if ui.button("Clear").clicked() {
-			self.app_sender.send(Message::Clear).unwrap();
+			self.sender.send(FromUiMsg::Clear).unwrap();
 		}
 	}
 
-	/// Render the main pain with the Gome of Life universe grid.
+	/// Render the main pain with the Game of Life universe grid.
 	fn main_panel(&mut self, ui: &mut egui::Ui) {
 		// TODO - we need to resize the cell grid to the right size for the cell size
 		// It should stay the same size overall.
@@ -136,13 +139,13 @@ impl EguiApp {
 					}
 				}
 				if ui.button("Exit").clicked() {
-					self.app_sender.send(Message::Shutdown).unwrap();
+					self.sender.send(FromUiMsg::Shutdown).unwrap();
 					std::process::exit(0);
 				}
 			});
 			ui.menu_button("Life", |ui| {
 				if ui.button("Run Generation").clicked() {
-					self.app_sender.send(Message::AdvanceOne).unwrap();
+					self.sender.send(FromUiMsg::AdvanceOne).unwrap();
 				}
 				if ui.button(self.run_button_text()).clicked() {
 					let current = self.running.load(Ordering::Relaxed);
@@ -178,8 +181,13 @@ impl eframe::App for EguiApp {
 		egui::TopBottomPanel::top("topbar_menus").show(ctx, |ui| self.topbar(ctx, ui));
 		egui::SidePanel::left("controls").show(ctx, |ui| self.control_panel(ui));
 		egui::CentralPanel::default().show(ctx, |ui| self.main_panel(ui));
-		// if self.app.running {
-		// 	self.app.universe.advance_generation();
-		// }
+	
+		if let Ok(msg) = self.receiver.try_recv() {
+			match msg {
+				ToUiMeg::Repaint => {
+					ctx.request_repaint();
+				}
+			}
+		}
 	}
 }
