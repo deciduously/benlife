@@ -13,7 +13,7 @@ mod universe;
 use app::App;
 use universe::Generation;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Set up native GUI integration options.
 	let native_options = native_options();
 
@@ -51,7 +51,9 @@ fn main() {
 		"Life of Ben",
 		native_options,
 		Box::new(|cc| Box::new(render::EguiApp::new(cc, app_sender, running, shared_gen))),
-	);
+	)?;
+
+	Ok(())
 }
 
 fn load_icon() -> eframe::IconData {

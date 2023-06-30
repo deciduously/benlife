@@ -1,4 +1,4 @@
-//! This module handles serializeing and deserializing universes from the RLE file format.
+//! This module handles serializing and deserializing universes from the RLE file format.
 //!
 //! <https://conwaylife.com/wiki/Run_Length_Encoded>
 

@@ -10,15 +10,15 @@ version = "0.1.0"
 
 [dependencies]
 crossbeam = "0.8"
-eframe = "0.18"
+eframe = "0.22"
 image = "0.24"
 parking_lot = "0.12"
 rand = "0.8"
-rfd = "0.8"
+rfd = "0.11"
 
 [dev-dependencies]
 pretty_assertions = "1.2"
-indoc = "1.0"
+indoc = "2.0"
 
 [profile.release]
 lto = true

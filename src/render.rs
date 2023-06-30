@@ -118,7 +118,7 @@ impl EguiApp {
 
 	/// Render the topbar File/Life/Help menu buttons.
 	fn topbar(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-		ui.with_layout(egui::Layout::left_to_right(), |ui| {
+		ui.with_layout(egui::Layout::left_to_right(eframe::emath::Align::Center), |ui| {
 			ui.menu_button("File", |ui| {
 				if ui.button("Open File").clicked() {
 					if let Some(path) = rfd::FileDialog::new().pick_file() {

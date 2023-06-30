@@ -210,16 +210,11 @@ pub struct Metadata {
 }
 
 /// The pattern to use to compute generations.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum Ruleset {
+	#[default]
 	Life,
 	// HighLife,
-}
-
-impl Default for Ruleset {
-	fn default() -> Self {
-		Ruleset::Life
-	}
 }
 
 impl std::fmt::Display for Ruleset {
